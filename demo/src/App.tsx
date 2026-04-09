@@ -4,10 +4,10 @@ import { OrbitControls, Grid } from '@react-three/drei';
 import { VFXProvider } from 'three-realistic-vfx/react';
 import { EffectsScene } from './scenes/EffectsScene';
 
-type EffectType = 'fire' | 'smoke' | 'explosion';
+type EffectType = 'fire' | 'smoke' | 'explosion' | 'test';
 
 export function App() {
-  const [activeEffect, setActiveEffect] = useState<EffectType>('fire');
+  const [activeEffect, setActiveEffect] = useState<EffectType>('test');
   const [triggerKey, setTriggerKey] = useState(0);
   const [useFlipbooks, setUseFlipbooks] = useState(false);
 
@@ -69,7 +69,7 @@ export function App() {
           zIndex: 10,
         }}
       >
-        {(['fire', 'smoke', 'explosion'] as EffectType[]).map((type) => (
+        {(['test', 'fire', 'smoke', 'explosion'] as EffectType[]).map((type) => (
           <button
             key={type}
             onClick={() => triggerEffect(type)}

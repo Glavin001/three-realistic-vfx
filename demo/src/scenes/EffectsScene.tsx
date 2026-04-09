@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Vector3, Texture } from 'three';
+import { Vector3, Texture, MeshBasicMaterial, AdditiveBlending, NormalBlending } from 'three';
 import { useVFX } from 'three-realistic-vfx/react';
 import {
   createFire,
@@ -7,20 +7,88 @@ import {
   createExplosion,
   loadFlipbooks,
   VFXComposite,
+  VFXRenderer,
 } from 'three-realistic-vfx';
+import {
+  ParticleSystem,
+  RenderMode,
+  BatchedRenderer,
+  ConstantValue,
+  IntervalValue,
+  ConstantColor,
+  Vector4 as QVector4,
+  SphereEmitter,
+  PointEmitter,
+  SizeOverLife,
+  ColorOverLife,
+  Bezier,
+  PiecewiseBezier,
+  Gradient,
+} from 'three.quarks';
+import { Vector3 as QVector3 } from 'quarks.core';
+import { getParticleAtlas, TileIndex, ATLAS_TILE_COUNT } from 'three-realistic-vfx';
 
 interface EffectsSceneProps {
-  activeEffect: 'fire' | 'smoke' | 'explosion';
+  activeEffect: 'fire' | 'smoke' | 'explosion' | 'test';
   triggerKey: number;
   useFlipbooks: boolean;
 }
 
-// Flipbook element keys to load for each effect type
 const FLIPBOOK_KEYS_BY_EFFECT = {
   fire: ['Flame03', 'FireBall01', 'FireBall02', 'WispySmoke01'],
   smoke: ['WispySmoke01', 'WispySmoke02', 'WispySmoke03', 'Cloud01', 'Cloud02'],
   explosion: ['Explosion01Light', 'Explosion02', 'FireBall01', 'WispySmoke01', 'Cloud01'],
+  test: [],
 };
+
+/**
+ * Bare-bones test particle system — bypasses all our abstractions.
+ * If this works, the issue is in our effect factories.
+ * If this doesn't work, the issue is in our renderer/scene setup.
+ */
+function createTestEffect(renderer: VFXRenderer): VFXComposite {
+  const atlas = getParticleAtlas();
+  const composite = new VFXComposite('Test');
+
+  const material = new MeshBasicMaterial({
+    map: atlas,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  });
+
+  const system = new ParticleSystem({
+    duration: 5,
+    looping: true,
+    worldSpace: true,
+    startLife: new IntervalValue(1, 3),
+    startSpeed: new ConstantValue(2),
+    startSize: new IntervalValue(0.3, 0.8),
+    startRotation: new ConstantValue(0),
+    startColor: new ConstantColor(new QVector4(1, 1, 1, 1)),
+    emissionOverTime: new ConstantValue(20),
+    emissionBursts: [{
+      time: 0,
+      count: new ConstantValue(20),
+      cycle: 1,
+      interval: 0.01,
+      probability: 1,
+    }],
+    shape: new PointEmitter(),
+    material,
+    startTileIndex: new ConstantValue(TileIndex.SoftCircle),
+    uTileCount: ATLAS_TILE_COUNT,
+    vTileCount: ATLAS_TILE_COUNT,
+    renderMode: RenderMode.BillBoard,
+    renderOrder: 0,
+    behaviors: [
+      new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 1, 0.5, 0), 0]])),
+    ],
+  });
+
+  composite.addSystem(system);
+  return composite;
+}
 
 export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: EffectsSceneProps) {
   const renderer = useVFX();
@@ -28,7 +96,6 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
   const [flipbookTextures, setFlipbookTextures] = useState<Map<string, Texture> | null>(null);
   const [loadingFlipbooks, setLoadingFlipbooks] = useState(false);
 
-  // Load flipbook textures on demand
   useEffect(() => {
     if (!useFlipbooks) {
       setFlipbookTextures(null);
@@ -36,7 +103,6 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
     }
 
     setLoadingFlipbooks(true);
-    // Collect all unique keys needed
     const allKeys = [...new Set(Object.values(FLIPBOOK_KEYS_BY_EFFECT).flat())];
 
     loadFlipbooks(allKeys, '/flipbooks/')
@@ -51,7 +117,6 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
   }, [useFlipbooks]);
 
   useEffect(() => {
-    // Don't create effect while flipbooks are still loading
     if (useFlipbooks && loadingFlipbooks) return;
 
     // Clean up previous effect
@@ -63,7 +128,6 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
 
     const wind = new Vector3(0.3, 0, 0);
 
-    // Build flipbook options if enabled
     const flipbookOpts = useFlipbooks && flipbookTextures
       ? {
           flipbook: FLIPBOOK_KEYS_BY_EFFECT[activeEffect],
@@ -74,6 +138,9 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
     let effect: VFXComposite;
 
     switch (activeEffect) {
+      case 'test':
+        effect = createTestEffect(renderer);
+        break;
       case 'fire':
         effect = createFire(renderer, {
           scale: 1,
@@ -116,10 +183,15 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
     renderer.addEffect(effect);
     currentEffect.current = effect;
 
-    // Debug logging
-    console.log(`[VFX] Created ${activeEffect} effect with ${effect.systems.length} sub-systems`);
-    for (const sys of effect.systems) {
-      console.log(`  - system: paused=${sys.paused}, looping=${sys.looping}, duration=${sys.duration}, emitter.parent=${sys.emitter.parent?.name || sys.emitter.parent?.type}`);
+    console.log(`[VFX] Created ${activeEffect} with ${effect.systems.length} systems`);
+    for (let i = 0; i < effect.systems.length; i++) {
+      const sys = effect.systems[i];
+      console.log(`  [${i}] paused=${sys.paused} looping=${sys.looping} dur=${sys.duration} renderMode=${sys.renderMode} emitter.parent=${sys.emitter.parent?.name || sys.emitter.parent?.type}`);
+      // Walk the parent chain
+      let p = sys.emitter as any;
+      const chain: string[] = [];
+      while (p) { chain.push(p.name || p.type || '?'); p = p.parent; }
+      console.log(`       chain: ${chain.join(' -> ')}`);
     }
 
     return () => {
