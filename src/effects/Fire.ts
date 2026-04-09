@@ -23,8 +23,11 @@ import type { VFXRenderer } from '../core/VFXRenderer';
 import { getParticleAtlas, TileIndex, ATLAS_TILE_COUNT } from '../core/TextureAtlas';
 import {
   fireGradient,
+  fireStartColor,
   smokeGradient,
+  smokeStartColor,
   emberGradient,
+  emberStartColor,
   bellCurve,
   growCurve,
   shrinkCurve,
@@ -89,7 +92,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     // Wide size range — small hot flickers mixed with large billows
     startSize: new IntervalValue(0.3 * widthScale, 1.4 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: fireGradient(),
+    startColor: fireStartColor(),
     // Higher emission for more particles creating volume
     emissionOverTime: new ConstantValue(40 * intensity),
     emissionBursts: [],
@@ -150,7 +153,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     startSpeed: new IntervalValue(1.5 * heightScale, 4.0 * heightScale),
     startSize: new IntervalValue(0.2 * widthScale, 0.8 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: fireGradient(),
+    startColor: fireStartColor(),
     emissionOverTime: new ConstantValue(20 * intensity),
     emissionBursts: [],
     shape: new SphereEmitter({
@@ -208,7 +211,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     startSpeed: new ConstantValue(0.5 * heightScale),
     startSize: new IntervalValue(0.6 * widthScale, 1.6 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: fireGradient(),
+    startColor: fireStartColor(),
     emissionOverTime: new ConstantValue(15 * intensity),
     emissionBursts: [],
     shape: new SphereEmitter({
@@ -249,7 +252,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       startSpeed: new IntervalValue(1.5 * heightScale, 4.5 * heightScale),
       startSize: new IntervalValue(0.015 * scale, 0.06 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
-      startColor: emberGradient(),
+      startColor: emberStartColor(),
       // More embers for a richer look
       emissionOverTime: new ConstantValue(15 * emberRate * intensity),
       emissionBursts: [],
@@ -310,7 +313,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       startSpeed: new IntervalValue(1.2 * heightScale, 2.8 * heightScale),
       startSize: new IntervalValue(0.3 * scale, 1.0 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
-      startColor: smokeGradient('darkGray'),
+      startColor: smokeStartColor('darkGray'),
       emissionOverTime: new ConstantValue(10 * smokeAmount * intensity),
       emissionBursts: [],
       shape: new ConeEmitter({

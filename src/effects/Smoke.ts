@@ -20,7 +20,7 @@ import type { SmokeOptions } from '../core/types';
 import { VFXComposite } from '../core/VFXComposite';
 import type { VFXRenderer } from '../core/VFXRenderer';
 import { getParticleAtlas, TileIndex, ATLAS_TILE_COUNT } from '../core/TextureAtlas';
-import { smokeGradient, growCurve, applySoftParticles, resolveFlipbook, applyFlipbookToSystem } from '../core/defaults';
+import { smokeGradient, smokeStartColor, growCurve, applySoftParticles, resolveFlipbook, applyFlipbookToSystem } from '../core/defaults';
 
 const SMOKE_COLOR_MAP: Record<string, 'lightGray' | 'mediumGray' | 'darkGray' | 'black'> = {
   light: 'lightGray',
@@ -86,7 +86,7 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     // Wide size range — small puffs mix with large billows for detail at all scales
     startSize: new IntervalValue(0.4 * scale, 1.8 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: smokeGradient(colorKey),
+    startColor: smokeStartColor(colorKey),
     emissionOverTime: new ConstantValue(18 * density * intensity),
     emissionBursts: [],
     // Sphere emitter gives particles natural 3D spread from the start
@@ -158,7 +158,7 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     startSpeed: new IntervalValue(riseSpeed * 0.2, riseSpeed * 0.6),
     startSize: new IntervalValue(0.6 * scale, 2.0 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: smokeGradient(colorKey),
+    startColor: smokeStartColor(colorKey),
     emissionOverTime: new ConstantValue(8 * density * intensity),
     emissionBursts: [],
     shape: new SphereEmitter({
@@ -225,7 +225,7 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     startSpeed: new IntervalValue(riseSpeed * 0.3, riseSpeed * 0.8),
     startSize: new IntervalValue(0.2 * scale, 0.6 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: smokeGradient('lightGray'),
+    startColor: smokeStartColor('lightGray'),
     emissionOverTime: new ConstantValue(8 * density * intensity),
     emissionBursts: [],
     shape: new ConeEmitter({

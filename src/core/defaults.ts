@@ -1,5 +1,5 @@
 import { Bezier, PiecewiseBezier, ParticleSystem, ConstantValue as QConstantValue } from 'three.quarks';
-import { Vector3 as QVector3 } from 'quarks.core';
+import { Vector3 as QVector3, Vector4 as QVector4, ConstantColor } from 'quarks.core';
 import { Gradient } from 'three.quarks';
 import type { Texture } from 'three';
 import type { VFXEffectOptions } from './types';
@@ -143,6 +143,35 @@ export function emberGradient(): Gradient {
       [0, 1],
     ]
   );
+}
+
+// ── Start color helpers (ConstantColor) ──
+//
+// IMPORTANT: three.quarks passes raw emissionState.time (seconds) as `t` to
+// startColor.genColor(), NOT normalized time. Gradients define stops at t=0..1,
+// so after 1 second all new particles get the last stop (alpha=0 → invisible).
+// Use ConstantColor for startColor; use Gradient only with ColorOverLife behavior
+// (which correctly uses normalized particle.age / particle.life).
+
+/** Fire start color: bright yellow-white, full opacity */
+export function fireStartColor(): ConstantColor {
+  return new ConstantColor(new QVector4(1.0, 0.95, 0.4, 1));
+}
+
+/** Smoke start color: solid gray at partial opacity */
+export function smokeStartColor(colorKey: keyof typeof SMOKE_COLORS = 'darkGray'): ConstantColor {
+  const c = SMOKE_COLORS[colorKey];
+  return new ConstantColor(new QVector4(c.x, c.y, c.z, 0.6));
+}
+
+/** Explosion start color: bright white, full opacity */
+export function explosionStartColor(): ConstantColor {
+  return new ConstantColor(new QVector4(1.0, 1.0, 0.95, 1));
+}
+
+/** Ember start color: bright orange, full opacity */
+export function emberStartColor(): ConstantColor {
+  return new ConstantColor(new QVector4(1.0, 0.4, 0.05, 1));
 }
 
 // ── Soft particle helper ──
