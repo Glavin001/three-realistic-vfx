@@ -90,7 +90,7 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
         effect = createSmoke(renderer, {
           scale: 1.2,
           intensity: 1,
-          smokeColor: 'dark',
+          smokeColor: 'light',
           density: 1,
           riseSpeed: 1.5,
           spread: 1,
@@ -115,6 +115,12 @@ export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: Effects
     effect.position.set(0, 0, 0);
     renderer.addEffect(effect);
     currentEffect.current = effect;
+
+    // Debug logging
+    console.log(`[VFX] Created ${activeEffect} effect with ${effect.systems.length} sub-systems`);
+    for (const sys of effect.systems) {
+      console.log(`  - system: paused=${sys.paused}, looping=${sys.looping}, duration=${sys.duration}, emitter.parent=${sys.emitter.parent?.name || sys.emitter.parent?.type}`);
+    }
 
     return () => {
       if (currentEffect.current) {
