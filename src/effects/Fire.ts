@@ -30,6 +30,8 @@ import {
   shrinkCurve,
   decelerateCurve,
   applySoftParticles,
+  resolveFlipbook,
+  applyFlipbookToSystem,
 } from '../core/defaults';
 
 /**
@@ -120,6 +122,12 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     );
   }
 
+  // Apply flipbook element if configured (fire/flame category)
+  const flameFlipbook = resolveFlipbook(options, 'flame') ?? resolveFlipbook(options, 'fire');
+  if (flameFlipbook) {
+    applyFlipbookToSystem(flames, flameFlipbook.meta, flameFlipbook.texture);
+  }
+
   applySoftParticles(flames, options);
   composite.addSystem(flames);
 
@@ -171,6 +179,12 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
         new ConstantValue(wind.z * 0.8)
       )
     );
+  }
+
+  // Use a fireball flipbook for the fill layer if available
+  const fillFlipbook = resolveFlipbook(options, 'fire');
+  if (fillFlipbook) {
+    applyFlipbookToSystem(flameFill, fillFlipbook.meta, fillFlipbook.texture);
   }
 
   applySoftParticles(flameFill, options);
@@ -334,6 +348,12 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
           new ConstantValue(wind.z)
         )
       );
+    }
+
+    // Use smoke/cloud flipbook for the smoke layer
+    const smokeFlipbook = resolveFlipbook(options, 'smoke') ?? resolveFlipbook(options, 'cloud');
+    if (smokeFlipbook) {
+      applyFlipbookToSystem(smoke, smokeFlipbook.meta, smokeFlipbook.texture);
     }
 
     applySoftParticles(smoke, options);

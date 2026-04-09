@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment } from '@react-three/drei';
+import { OrbitControls, Grid } from '@react-three/drei';
 import { VFXProvider } from 'three-realistic-vfx/react';
 import { EffectsScene } from './scenes/EffectsScene';
 
@@ -9,6 +9,7 @@ type EffectType = 'fire' | 'smoke' | 'explosion';
 export function App() {
   const [activeEffect, setActiveEffect] = useState<EffectType>('fire');
   const [triggerKey, setTriggerKey] = useState(0);
+  const [useFlipbooks, setUseFlipbooks] = useState(false);
 
   const triggerEffect = useCallback((type: EffectType) => {
     setActiveEffect(type);
@@ -17,7 +18,6 @@ export function App() {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* 3D Canvas */}
       <Canvas
         camera={{ position: [0, 3, 8], fov: 50 }}
         gl={{ antialias: true, alpha: false }}
@@ -28,7 +28,11 @@ export function App() {
         <directionalLight position={[5, 8, 3]} intensity={0.8} />
 
         <VFXProvider>
-          <EffectsScene activeEffect={activeEffect} triggerKey={triggerKey} />
+          <EffectsScene
+            activeEffect={activeEffect}
+            triggerKey={triggerKey}
+            useFlipbooks={useFlipbooks}
+          />
         </VFXProvider>
 
         <Grid
@@ -52,7 +56,7 @@ export function App() {
         />
       </Canvas>
 
-      {/* UI Overlay */}
+      {/* Effect buttons */}
       <div
         style={{
           position: 'absolute',
@@ -61,6 +65,7 @@ export function App() {
           transform: 'translateX(-50%)',
           display: 'flex',
           gap: 12,
+          alignItems: 'center',
           zIndex: 10,
         }}
       >
@@ -87,15 +92,38 @@ export function App() {
                       : '#546e7a'
                   : '#333',
               transition: 'all 0.2s',
-              boxShadow:
-                activeEffect === type
-                  ? '0 0 20px rgba(255,100,0,0.3)'
-                  : 'none',
             }}
           >
-            {type === 'fire' ? '🔥 Fire' : type === 'smoke' ? '💨 Smoke' : '💥 Explosion'}
+            {type}
           </button>
         ))}
+
+        {/* Flipbook toggle */}
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: '#fff',
+            fontSize: 14,
+            cursor: 'pointer',
+            padding: '12px 16px',
+            background: useFlipbooks ? '#1b5e20' : '#333',
+            borderRadius: 8,
+            transition: 'all 0.2s',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={useFlipbooks}
+            onChange={(e) => {
+              setUseFlipbooks(e.target.checked);
+              setTriggerKey((k) => k + 1);
+            }}
+            style={{ cursor: 'pointer' }}
+          />
+          Flipbook Elements
+        </label>
       </div>
 
       {/* Title */}
@@ -112,7 +140,7 @@ export function App() {
           three-realistic-vfx
         </h1>
         <p style={{ fontSize: 14, opacity: 0.6, marginTop: 4 }}>
-          Click an effect to trigger it. Orbit with mouse.
+          Click an effect to trigger it. Toggle flipbook elements for higher fidelity.
         </p>
       </div>
     </div>

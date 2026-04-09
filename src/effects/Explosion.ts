@@ -38,6 +38,8 @@ import {
   growCurve,
   bellCurve,
   applySoftParticles,
+  resolveFlipbook,
+  applyFlipbookToSystem,
 } from '../core/defaults';
 
 // Shared geometry for mesh particles — icosahedron is a cheap lumpy sphere
@@ -170,6 +172,12 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
       new SpeedOverLife(decelerateCurve()),
     ],
   });
+
+  // Apply explosion/fire flipbook elements to the billboard fireball
+  const fireballFlipbook = resolveFlipbook(options, 'explosion') ?? resolveFlipbook(options, 'fire');
+  if (fireballFlipbook) {
+    applyFlipbookToSystem(fireball, fireballFlipbook.meta, fireballFlipbook.texture);
+  }
 
   applySoftParticles(fireball, options);
   composite.addSystem(fireball);
@@ -400,6 +408,12 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
           new ConstantValue(wind.z)
         )
       );
+    }
+
+    // Use smoke flipbook for the smoke column
+    const smokeFlipbook = resolveFlipbook(options, 'smoke') ?? resolveFlipbook(options, 'cloud');
+    if (smokeFlipbook) {
+      applyFlipbookToSystem(smoke, smokeFlipbook.meta, smokeFlipbook.texture);
     }
 
     applySoftParticles(smoke, options);

@@ -1,7 +1,10 @@
-import { Bezier, PiecewiseBezier, ParticleSystem } from 'three.quarks';
+import { Bezier, PiecewiseBezier, ParticleSystem, ConstantValue as QConstantValue } from 'three.quarks';
 import { Vector3 as QVector3 } from 'quarks.core';
 import { Gradient } from 'three.quarks';
+import type { Texture } from 'three';
 import type { VFXEffectOptions } from './types';
+import { FLIPBOOK_ELEMENTS, flipbookFrameOverLife } from './FlipbookElements';
+import type { FlipbookMeta } from './FlipbookElements';
 
 // ── Color palettes (as quarks.core Vector3 RGB, 0-1 range) ──
 
@@ -159,4 +162,53 @@ export function applySoftParticles(
     system.softNearFade = softNearFade;
     system.softFarFade = softFarFade;
   }
+}
+
+// ── Flipbook helpers ──
+
+/**
+ * Resolve a flipbook element key to its texture and metadata.
+ * If multiple keys are provided, picks one at random.
+ * Returns null if no flipbook is configured.
+ */
+export function resolveFlipbook(
+  options: VFXEffectOptions,
+  categoryFilter?: FlipbookMeta['category'],
+): { texture: Texture; meta: FlipbookMeta } | null {
+  const { flipbook, flipbookTextures } = options;
+  if (!flipbook || !flipbookTextures) return null;
+
+  // Resolve key(s)
+  const keys = Array.isArray(flipbook) ? flipbook : [flipbook];
+  // Filter to requested category if specified
+  const validKeys = categoryFilter
+    ? keys.filter((k) => FLIPBOOK_ELEMENTS[k]?.category === categoryFilter)
+    : keys;
+
+  if (validKeys.length === 0) return null;
+
+  // Pick a random key from the valid set
+  const key = validKeys[Math.floor(Math.random() * validKeys.length)];
+  const meta = FLIPBOOK_ELEMENTS[key];
+  const texture = flipbookTextures.get(key);
+
+  if (!meta || !texture) return null;
+  return { texture, meta };
+}
+
+/**
+ * Apply flipbook configuration to a ParticleSystem.
+ * Sets the texture, tile counts, startTileIndex, and adds FrameOverLife animation.
+ * This replaces the procedural atlas texture with an animated flipbook element.
+ */
+export function applyFlipbookToSystem(
+  system: ParticleSystem,
+  meta: FlipbookMeta,
+  texture: Texture,
+): void {
+  system.texture = texture;
+  system.uTileCount = meta.uTileCount;
+  system.vTileCount = meta.vTileCount;
+  system.startTileIndex = new QConstantValue(0);
+  system.addBehavior(flipbookFrameOverLife(meta));
 }

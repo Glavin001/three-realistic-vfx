@@ -20,7 +20,7 @@ import type { SmokeOptions } from '../core/types';
 import { VFXComposite } from '../core/VFXComposite';
 import type { VFXRenderer } from '../core/VFXRenderer';
 import { getParticleAtlas, TileIndex, ATLAS_TILE_COUNT } from '../core/TextureAtlas';
-import { smokeGradient, growCurve, applySoftParticles } from '../core/defaults';
+import { smokeGradient, growCurve, applySoftParticles, resolveFlipbook, applyFlipbookToSystem } from '../core/defaults';
 
 const SMOKE_COLOR_MAP: Record<string, 'lightGray' | 'mediumGray' | 'darkGray' | 'black'> = {
   light: 'lightGray',
@@ -130,6 +130,12 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     )
   );
 
+  // Apply flipbook element if configured (overrides procedural atlas)
+  const smokeFlipbook = resolveFlipbook(options, 'smoke') ?? resolveFlipbook(options, 'cloud');
+  if (smokeFlipbook) {
+    applyFlipbookToSystem(mainSmoke, smokeFlipbook.meta, smokeFlipbook.texture);
+  }
+
   applySoftParticles(mainSmoke, options);
   composite.addSystem(mainSmoke);
 
@@ -190,6 +196,12 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
       new ConstantValue(0)
     )
   );
+
+  // Apply a different flipbook variant for depth variety
+  const fillFlipbook = resolveFlipbook(options, 'cloud') ?? resolveFlipbook(options, 'smoke');
+  if (fillFlipbook) {
+    applyFlipbookToSystem(fill, fillFlipbook.meta, fillFlipbook.texture);
+  }
 
   applySoftParticles(fill, options);
   composite.addSystem(fill);

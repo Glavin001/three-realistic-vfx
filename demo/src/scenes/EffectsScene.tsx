@@ -1,19 +1,59 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import { Vector3 } from 'three';
+import React, { useEffect, useRef, useState } from 'react';
+import { Vector3, Texture } from 'three';
 import { useVFX } from 'three-realistic-vfx/react';
-import { createFire, createSmoke, createExplosion } from 'three-realistic-vfx';
-import type { VFXComposite } from 'three-realistic-vfx';
+import {
+  createFire,
+  createSmoke,
+  createExplosion,
+  loadFlipbooks,
+  VFXComposite,
+} from 'three-realistic-vfx';
 
 interface EffectsSceneProps {
   activeEffect: 'fire' | 'smoke' | 'explosion';
   triggerKey: number;
+  useFlipbooks: boolean;
 }
 
-export function EffectsScene({ activeEffect, triggerKey }: EffectsSceneProps) {
+// Flipbook element keys to load for each effect type
+const FLIPBOOK_KEYS_BY_EFFECT = {
+  fire: ['Flame03', 'FireBall01', 'FireBall02', 'WispySmoke01'],
+  smoke: ['WispySmoke01', 'WispySmoke02', 'WispySmoke03', 'Cloud01', 'Cloud02'],
+  explosion: ['Explosion01Light', 'Explosion02', 'FireBall01', 'WispySmoke01', 'Cloud01'],
+};
+
+export function EffectsScene({ activeEffect, triggerKey, useFlipbooks }: EffectsSceneProps) {
   const renderer = useVFX();
   const currentEffect = useRef<VFXComposite | null>(null);
+  const [flipbookTextures, setFlipbookTextures] = useState<Map<string, Texture> | null>(null);
+  const [loadingFlipbooks, setLoadingFlipbooks] = useState(false);
+
+  // Load flipbook textures on demand
+  useEffect(() => {
+    if (!useFlipbooks) {
+      setFlipbookTextures(null);
+      return;
+    }
+
+    setLoadingFlipbooks(true);
+    // Collect all unique keys needed
+    const allKeys = [...new Set(Object.values(FLIPBOOK_KEYS_BY_EFFECT).flat())];
+
+    loadFlipbooks(allKeys, '/flipbooks/')
+      .then((textures) => {
+        setFlipbookTextures(textures);
+        setLoadingFlipbooks(false);
+      })
+      .catch((err) => {
+        console.warn('Failed to load flipbooks, falling back to procedural:', err);
+        setLoadingFlipbooks(false);
+      });
+  }, [useFlipbooks]);
 
   useEffect(() => {
+    // Don't create effect while flipbooks are still loading
+    if (useFlipbooks && loadingFlipbooks) return;
+
     // Clean up previous effect
     if (currentEffect.current) {
       currentEffect.current.dispose();
@@ -21,9 +61,17 @@ export function EffectsScene({ activeEffect, triggerKey }: EffectsSceneProps) {
       currentEffect.current = null;
     }
 
-    // Create new effect
-    let effect: VFXComposite;
     const wind = new Vector3(0.3, 0, 0);
+
+    // Build flipbook options if enabled
+    const flipbookOpts = useFlipbooks && flipbookTextures
+      ? {
+          flipbook: FLIPBOOK_KEYS_BY_EFFECT[activeEffect],
+          flipbookTextures,
+        }
+      : {};
+
+    let effect: VFXComposite;
 
     switch (activeEffect) {
       case 'fire':
@@ -35,6 +83,7 @@ export function EffectsScene({ activeEffect, triggerKey }: EffectsSceneProps) {
           smokeAmount: 0.6,
           emberRate: 0.4,
           wind,
+          ...flipbookOpts,
         });
         break;
       case 'smoke':
@@ -46,6 +95,7 @@ export function EffectsScene({ activeEffect, triggerKey }: EffectsSceneProps) {
           riseSpeed: 1.5,
           spread: 1,
           wind,
+          ...flipbookOpts,
         });
         break;
       case 'explosion':
@@ -57,6 +107,7 @@ export function EffectsScene({ activeEffect, triggerKey }: EffectsSceneProps) {
           includeDebris: true,
           includeSmoke: true,
           wind,
+          ...flipbookOpts,
         });
         break;
     }
@@ -72,7 +123,7 @@ export function EffectsScene({ activeEffect, triggerKey }: EffectsSceneProps) {
         currentEffect.current = null;
       }
     };
-  }, [activeEffect, triggerKey, renderer]);
+  }, [activeEffect, triggerKey, renderer, useFlipbooks, flipbookTextures, loadingFlipbooks]);
 
   return null;
 }
