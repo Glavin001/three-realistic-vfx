@@ -17,6 +17,12 @@ export interface VFXEffectOptions {
   worldSpace?: boolean;
   /** Custom texture to override procedural defaults */
   texture?: Texture;
+  /** Enable soft particles (depth-fade at geometry intersections). Requires depth texture on VFXRenderer. (default: true) */
+  softParticles?: boolean;
+  /** Soft particle near fade distance (default: 0.1) */
+  softNearFade?: number;
+  /** Soft particle far fade distance (default: 1.0) */
+  softFarFade?: number;
 }
 
 export interface SmokeOptions extends VFXEffectOptions {

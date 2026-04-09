@@ -2,6 +2,7 @@
 export { VFXRenderer } from './core/VFXRenderer';
 export { VFXComposite } from './core/VFXComposite';
 export { getParticleAtlas, clearAtlasCache, TileIndex, ATLAS_TILE_COUNT } from './core/TextureAtlas';
+export { applySoftParticles } from './core/defaults';
 
 // Effects
 export { createSmoke } from './effects/Smoke';

@@ -1,6 +1,7 @@
-import { Bezier, PiecewiseBezier } from 'three.quarks';
+import { Bezier, PiecewiseBezier, ParticleSystem } from 'three.quarks';
 import { Vector3 as QVector3 } from 'quarks.core';
 import { Gradient } from 'three.quarks';
+import type { VFXEffectOptions } from './types';
 
 // ── Color palettes (as quarks.core Vector3 RGB, 0-1 range) ──
 
@@ -139,4 +140,23 @@ export function emberGradient(): Gradient {
       [0, 1],
     ]
   );
+}
+
+// ── Soft particle helper ──
+
+/**
+ * Apply soft particle settings to a ParticleSystem based on effect options.
+ * Soft particles fade out where they intersect scene geometry, preventing
+ * hard billboard clipping artifacts. This is standard in AAA particle systems.
+ */
+export function applySoftParticles(
+  system: ParticleSystem,
+  options: VFXEffectOptions,
+): void {
+  const { softParticles = true, softNearFade = 0.1, softFarFade = 1.0 } = options;
+  if (softParticles) {
+    system.softParticles = true;
+    system.softNearFade = softNearFade;
+    system.softFarFade = softFarFade;
+  }
 }

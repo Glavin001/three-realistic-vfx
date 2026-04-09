@@ -4,6 +4,7 @@ import {
 } from 'three.quarks';
 import {
   ConeEmitter,
+  SphereEmitter,
   PointEmitter,
   ConstantValue,
   IntervalValue,
@@ -12,7 +13,6 @@ import {
   RotationOverLife,
   ForceOverLife,
   SpeedOverLife,
-  FrameOverLife,
   Bezier,
   PiecewiseBezier,
 } from 'three.quarks';
@@ -29,16 +29,21 @@ import {
   growCurve,
   shrinkCurve,
   decelerateCurve,
+  applySoftParticles,
 } from '../core/defaults';
 
 /**
  * Create a realistic fire effect.
  *
- * Composed of 4 sub-systems:
- * 1. Flames - Core fire with noise-blob textures, additive blending, color gradient
- * 2. Inner glow - Bright additive core at the flame base
- * 3. Embers - Tiny bright dots rising, stretched billboards
- * 4. Smoke - Dark billboards rising above the flames (optional)
+ * Composed of 5 sub-systems layered for depth:
+ * 1. Flames (core) - Many noise-blob billboards spread in 3D via cone emitter
+ * 2. Flame fill - Additional flame particles at wider spread for volume
+ * 3. Inner glow - Bright additive core at the flame base
+ * 4. Embers - Tiny bright dots rising, stretched billboards
+ * 5. Smoke - Dark billboards rising above the flames (optional)
+ *
+ * Key realism: 40+ flame particles at varying depths give parallax volume.
+ * Wide size/lifetime/speed variance prevents tiling artifacts.
  */
 export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VFXComposite {
   const {
@@ -61,7 +66,8 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
   const heightScale = flameHeight * scale;
   const widthScale = flameWidth * scale;
 
-  // ── Sub-system 1: Flames (core fire) ──
+  // ── Sub-system 1: Flames (core) ──
+  // The workhorse — many particles spread across a cone for 3D volume
   const flameMaterial = new MeshBasicMaterial({
     map: atlas,
     transparent: true,
@@ -75,17 +81,20 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     autoDestroy: !looping,
     prewarm: looping,
     worldSpace,
-    startLife: new IntervalValue(0.4 * heightScale, 0.9 * heightScale),
-    startSpeed: new IntervalValue(1.5 * heightScale, 3.0 * heightScale),
-    startSize: new IntervalValue(0.5 * widthScale, 1.2 * widthScale),
+    // Wide ranges create layered depth
+    startLife: new IntervalValue(0.3 * heightScale, 1.0 * heightScale),
+    startSpeed: new IntervalValue(1.2 * heightScale, 3.5 * heightScale),
+    // Wide size range — small hot flickers mixed with large billows
+    startSize: new IntervalValue(0.3 * widthScale, 1.4 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
     startColor: fireGradient(),
-    emissionOverTime: new ConstantValue(30 * intensity),
+    // Higher emission for more particles creating volume
+    emissionOverTime: new ConstantValue(40 * intensity),
     emissionBursts: [],
     shape: new ConeEmitter({
-      radius: widthScale * 0.6,
-      angle: 0.15,
-      thickness: 0.5,
+      radius: widthScale * 0.7,
+      angle: 0.2,
+      thickness: 0.7, // Spawn throughout cone, not just surface
     }),
     material: flameMaterial,
     startTileIndex: new IntervalValue(TileIndex.NoiseBlob1, TileIndex.NoiseBlob3 + 0.99),
@@ -96,7 +105,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     behaviors: [
       new SizeOverLife(bellCurve()),
       new ColorOverLife(fireGradient()),
-      new RotationOverLife(new IntervalValue(-0.4, 0.4)),
+      new RotationOverLife(new IntervalValue(-0.5, 0.5)),
       new SpeedOverLife(decelerateCurve()),
     ],
   });
@@ -111,9 +120,63 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     );
   }
 
+  applySoftParticles(flames, options);
   composite.addSystem(flames);
 
-  // ── Sub-system 2: Inner glow (bright core at base) ──
+  // ── Sub-system 2: Flame fill (parallax depth) ──
+  // Wider-spread flame particles at different sizes to fill depth gaps
+  const fillMaterial = new MeshBasicMaterial({
+    map: atlas,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  });
+
+  const flameFill = new ParticleSystem({
+    duration: 1,
+    looping,
+    autoDestroy: !looping,
+    prewarm: looping,
+    worldSpace,
+    startLife: new IntervalValue(0.2 * heightScale, 0.7 * heightScale),
+    startSpeed: new IntervalValue(1.5 * heightScale, 4.0 * heightScale),
+    startSize: new IntervalValue(0.2 * widthScale, 0.8 * widthScale),
+    startRotation: new IntervalValue(0, Math.PI * 2),
+    startColor: fireGradient(),
+    emissionOverTime: new ConstantValue(20 * intensity),
+    emissionBursts: [],
+    shape: new SphereEmitter({
+      radius: widthScale * 0.5,
+      thickness: 1,
+    }),
+    material: fillMaterial,
+    startTileIndex: new IntervalValue(TileIndex.FlameLick, TileIndex.FlameLick + 0.99),
+    uTileCount: ATLAS_TILE_COUNT,
+    vTileCount: ATLAS_TILE_COUNT,
+    renderMode: RenderMode.BillBoard,
+    renderOrder: 2,
+    behaviors: [
+      new SizeOverLife(bellCurve()),
+      new ColorOverLife(fireGradient()),
+      new RotationOverLife(new IntervalValue(-0.6, 0.6)),
+      new SpeedOverLife(decelerateCurve()),
+    ],
+  });
+
+  if (wind) {
+    flameFill.addBehavior(
+      new ForceOverLife(
+        new ConstantValue(wind.x * 0.8),
+        new ConstantValue(wind.y * 0.8),
+        new ConstantValue(wind.z * 0.8)
+      )
+    );
+  }
+
+  applySoftParticles(flameFill, options);
+  composite.addSystem(flameFill);
+
+  // ── Sub-system 3: Inner glow (bright core at base) ──
   const glowMaterial = new MeshBasicMaterial({
     map: atlas,
     transparent: true,
@@ -127,14 +190,17 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     autoDestroy: !looping,
     prewarm: looping,
     worldSpace,
-    startLife: new IntervalValue(0.1, 0.3),
+    startLife: new IntervalValue(0.08, 0.25),
     startSpeed: new ConstantValue(0.5 * heightScale),
-    startSize: new IntervalValue(0.8 * widthScale, 1.5 * widthScale),
+    startSize: new IntervalValue(0.6 * widthScale, 1.6 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
     startColor: fireGradient(),
     emissionOverTime: new ConstantValue(15 * intensity),
     emissionBursts: [],
-    shape: new PointEmitter(),
+    shape: new SphereEmitter({
+      radius: widthScale * 0.2,
+      thickness: 1,
+    }),
     material: glowMaterial,
     startTileIndex: new ConstantValue(TileIndex.SoftCircle),
     uTileCount: ATLAS_TILE_COUNT,
@@ -147,9 +213,10 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     ],
   });
 
+  applySoftParticles(glow, options);
   composite.addSystem(glow);
 
-  // ── Sub-system 3: Embers ──
+  // ── Sub-system 4: Embers ──
   if (emberRate > 0) {
     const emberMaterial = new MeshBasicMaterial({
       map: atlas,
@@ -164,16 +231,17 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       autoDestroy: !looping,
       prewarm: looping,
       worldSpace,
-      startLife: new IntervalValue(1.0, 2.5),
-      startSpeed: new IntervalValue(2.0 * heightScale, 4.0 * heightScale),
-      startSize: new IntervalValue(0.02 * scale, 0.06 * scale),
+      startLife: new IntervalValue(1.0, 3.0),
+      startSpeed: new IntervalValue(1.5 * heightScale, 4.5 * heightScale),
+      startSize: new IntervalValue(0.015 * scale, 0.06 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
       startColor: emberGradient(),
-      emissionOverTime: new ConstantValue(10 * emberRate * intensity),
+      // More embers for a richer look
+      emissionOverTime: new ConstantValue(15 * emberRate * intensity),
       emissionBursts: [],
       shape: new ConeEmitter({
-        radius: widthScale * 0.3,
-        angle: 0.4,
+        radius: widthScale * 0.4,
+        angle: 0.5,
         thickness: 1,
       }),
       material: emberMaterial,
@@ -187,7 +255,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
         new SizeOverLife(shrinkCurve()),
         new ColorOverLife(emberGradient()),
         new SpeedOverLife(decelerateCurve()),
-        // Slight upward bias to counteract gravity for floating embers
+        // Upward buoyancy for floating embers
         new ForceOverLife(
           new ConstantValue(0),
           new ConstantValue(1.5 * gravity),
@@ -209,7 +277,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     composite.addSystem(embers);
   }
 
-  // ── Sub-system 4: Smoke (above the flames) ──
+  // ── Sub-system 5: Smoke (above the flames) ──
   if (includeSmoke && smokeAmount > 0) {
     const smokeMaterial = new MeshBasicMaterial({
       map: atlas,
@@ -224,17 +292,17 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       autoDestroy: !looping,
       prewarm: looping,
       worldSpace,
-      startLife: new IntervalValue(2.0, 4.0),
-      startSpeed: new IntervalValue(1.5 * heightScale, 2.5 * heightScale),
-      startSize: new IntervalValue(0.4 * scale, 0.8 * scale),
+      startLife: new IntervalValue(2.0, 5.0),
+      startSpeed: new IntervalValue(1.2 * heightScale, 2.8 * heightScale),
+      startSize: new IntervalValue(0.3 * scale, 1.0 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
       startColor: smokeGradient('darkGray'),
-      emissionOverTime: new ConstantValue(8 * smokeAmount * intensity),
+      emissionOverTime: new ConstantValue(10 * smokeAmount * intensity),
       emissionBursts: [],
       shape: new ConeEmitter({
-        radius: widthScale * 0.4,
-        angle: 0.2,
-        thickness: 1,
+        radius: widthScale * 0.5,
+        angle: 0.25,
+        thickness: 0.8,
       }),
       material: smokeMaterial,
       startTileIndex: new IntervalValue(TileIndex.CloudNoise1, TileIndex.CloudNoise3 + 0.99),
@@ -255,7 +323,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       ],
     });
 
-    // Offset smoke emitter slightly upward
+    // Offset smoke emitter upward — smoke comes from above the flames
     smoke.emitter.position.y = heightScale * 0.5;
 
     if (wind) {
@@ -268,6 +336,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       );
     }
 
+    applySoftParticles(smoke, options);
     composite.addSystem(smoke);
   }
 
