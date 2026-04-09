@@ -28,6 +28,7 @@ export class VFXRenderer extends BatchedRenderer {
   /** Register a composite effect and add all its particle systems to the batch renderer. */
   addEffect(effect: VFXComposite): void {
     this.effects.add(effect);
+    effect.attachRenderer(this);
     for (const system of effect.systems) {
       this.addSystem(system);
     }

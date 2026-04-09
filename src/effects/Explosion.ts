@@ -32,12 +32,17 @@ import {
   emberGradient,
   smokeGradient,
   fireGradient,
+  explosionStartColor,
   explosionSizeCurve,
+  emberStartColor,
+  smokeStartColor,
   shrinkCurve,
   decelerateCurve,
   growCurve,
   bellCurve,
   applySoftParticles,
+  resolveFlipbook,
+  applyFlipbookToSystem,
 } from '../core/defaults';
 
 // Shared geometry for mesh particles — icosahedron is a cheap lumpy sphere
@@ -94,7 +99,7 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
     startSpeed: new IntervalValue(r * 1.5, r * 4),
     startSize: new IntervalValue(r * 0.3, r * 0.8),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: explosionGradient(),
+    startColor: explosionStartColor(),
     emissionOverTime: new ConstantValue(0),
     emissionBursts: [
       {
@@ -142,7 +147,7 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
     // Wide size range for depth layering
     startSize: new IntervalValue(r * 0.3, r * 1.5),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: explosionGradient(),
+    startColor: explosionStartColor(),
     emissionOverTime: new ConstantValue(0),
     emissionBursts: [
       {
@@ -171,6 +176,12 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
     ],
   });
 
+  // Apply explosion/fire flipbook elements to the billboard fireball
+  const fireballFlipbook = resolveFlipbook(options, 'explosion') ?? resolveFlipbook(options, 'fire');
+  if (fireballFlipbook) {
+    applyFlipbookToSystem(fireball, fireballFlipbook.meta, fireballFlipbook.texture);
+  }
+
   applySoftParticles(fireball, options);
   composite.addSystem(fireball);
 
@@ -192,7 +203,7 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
       startSpeed: new ConstantValue(0),
       startSize: new ConstantValue(r * 0.3),
       startRotation: new ConstantValue(0),
-      startColor: explosionGradient(),
+      startColor: explosionStartColor(),
       emissionOverTime: new ConstantValue(0),
       emissionBursts: [
         {
@@ -237,7 +248,7 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
       startSpeed: new IntervalValue(r * 3, r * 10),
       startSize: new IntervalValue(0.04 * scale, 0.18 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
-      startColor: smokeGradient('darkGray'),
+      startColor: smokeStartColor('darkGray'),
       emissionOverTime: new ConstantValue(0),
       emissionBursts: [
         {
@@ -290,7 +301,7 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
     startSpeed: new IntervalValue(r * 4, r * 12),
     startSize: new IntervalValue(0.015 * scale, 0.06 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: emberGradient(),
+    startColor: emberStartColor(),
     emissionOverTime: new ConstantValue(0),
     emissionBursts: [
       {
@@ -356,7 +367,7 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
       // Wide size range — small wisps + large billows
       startSize: new IntervalValue(0.3 * scale, 1.5 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
-      startColor: smokeGradient('black'),
+      startColor: smokeStartColor('black'),
       emissionOverTime: new ConstantValue(25 * intensity),
       emissionBursts: [
         {
@@ -400,6 +411,12 @@ export function createExplosion(renderer: VFXRenderer, options: ExplosionOptions
           new ConstantValue(wind.z)
         )
       );
+    }
+
+    // Use smoke flipbook for the smoke column
+    const smokeFlipbook = resolveFlipbook(options, 'smoke') ?? resolveFlipbook(options, 'cloud');
+    if (smokeFlipbook) {
+      applyFlipbookToSystem(smoke, smokeFlipbook.meta, smokeFlipbook.texture);
     }
 
     applySoftParticles(smoke, options);

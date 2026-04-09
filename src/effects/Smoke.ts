@@ -14,13 +14,15 @@ import {
   SpeedOverLife,
   Bezier,
   PiecewiseBezier,
+  ConstantColor,
+  Vector4 as QVector4,
 } from 'three.quarks';
 import { MeshBasicMaterial, NormalBlending } from 'three';
 import type { SmokeOptions } from '../core/types';
 import { VFXComposite } from '../core/VFXComposite';
 import type { VFXRenderer } from '../core/VFXRenderer';
 import { getParticleAtlas, TileIndex, ATLAS_TILE_COUNT } from '../core/TextureAtlas';
-import { smokeGradient, growCurve, applySoftParticles } from '../core/defaults';
+import { smokeGradient, smokeStartColor, growCurve, applySoftParticles, resolveFlipbook, applyFlipbookToSystem } from '../core/defaults';
 
 const SMOKE_COLOR_MAP: Record<string, 'lightGray' | 'mediumGray' | 'darkGray' | 'black'> = {
   light: 'lightGray',
@@ -35,9 +37,6 @@ const SMOKE_COLOR_MAP: Record<string, 'lightGray' | 'mediumGray' | 'darkGray' | 
  * 1. Main smoke billows - large, expanding, slowly rising cloud noise billboards
  * 2. Secondary billows - offset particles at varying depths for parallax volume
  * 3. Smoke wisps - smaller, lighter particles with more drift
- *
- * Key realism technique: many particles at different depths create a volumetric
- * feel from parallax, rather than relying on a single large billboard.
  */
 export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): VFXComposite {
   const {
@@ -65,7 +64,6 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
   }
 
   // ── Sub-system 1: Main smoke billows ──
-  // Many particles spread across a sphere emitter for 3D volume
   const mainSmokeMaterial = new MeshBasicMaterial({
     map: atlas,
     transparent: true,
@@ -77,25 +75,25 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     duration,
     looping,
     autoDestroy: !looping,
-    prewarm: looping,
     worldSpace,
-    // Wide lifetime range creates layered depth as particles at different ages
-    // exist at different sizes and opacities simultaneously
     startLife: new IntervalValue(2.5 * scale, 5.0 * scale),
     startSpeed: new IntervalValue(riseSpeed * 0.4, riseSpeed * 1.2),
-    // Wide size range — small puffs mix with large billows for detail at all scales
     startSize: new IntervalValue(0.4 * scale, 1.8 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: smokeGradient(colorKey),
+    startColor: smokeStartColor(colorKey),
     emissionOverTime: new ConstantValue(18 * density * intensity),
-    emissionBursts: [],
-    // Sphere emitter gives particles natural 3D spread from the start
+    emissionBursts: [{
+      time: 0,
+      count: new ConstantValue(10),
+      cycle: 1,
+      interval: 0.01,
+      probability: 1,
+    }],
     shape: new SphereEmitter({
       radius: 0.4 * scale * spread,
-      thickness: 0.8, // Particles spawn throughout the sphere, not just the surface
+      thickness: 0.8,
     }),
     material: mainSmokeMaterial,
-    // Randomize across all 3 cloud noise tiles for visual variety
     startTileIndex: new IntervalValue(TileIndex.CloudNoise1, TileIndex.CloudNoise3 + 0.99),
     uTileCount: ATLAS_TILE_COUNT,
     vTileCount: ATLAS_TILE_COUNT,
@@ -104,13 +102,11 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     behaviors: [
       new SizeOverLife(growCurve()),
       new ColorOverLife(smokeGradient(colorKey)),
-      // Slow random rotation prevents static-looking billboards
       new RotationOverLife(new IntervalValue(-0.3, 0.3)),
       new SpeedOverLife(new PiecewiseBezier([[new Bezier(1, 0.6, 0.3, 0.1), 0]])),
     ],
   });
 
-  // Wind
   if (wind) {
     mainSmoke.addBehavior(
       new ForceOverLife(
@@ -121,7 +117,6 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     );
   }
 
-  // Buoyancy — smoke rises
   mainSmoke.addBehavior(
     new ForceOverLife(
       new ConstantValue(0),
@@ -130,11 +125,15 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     )
   );
 
+  const smokeFlipbook = resolveFlipbook(options, 'smoke') ?? resolveFlipbook(options, 'cloud');
+  if (smokeFlipbook) {
+    applyFlipbookToSystem(mainSmoke, smokeFlipbook.meta, smokeFlipbook.texture);
+  }
+
   applySoftParticles(mainSmoke, options);
   composite.addSystem(mainSmoke);
 
   // ── Sub-system 2: Secondary billows (depth fill) ──
-  // Additional particles at a wider spread to fill in gaps and add parallax depth
   const fillMaterial = new MeshBasicMaterial({
     map: atlas,
     transparent: true,
@@ -146,18 +145,17 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     duration,
     looping,
     autoDestroy: !looping,
-    prewarm: looping,
     worldSpace,
     startLife: new IntervalValue(3.0 * scale, 5.5 * scale),
     startSpeed: new IntervalValue(riseSpeed * 0.2, riseSpeed * 0.6),
     startSize: new IntervalValue(0.6 * scale, 2.0 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: smokeGradient(colorKey),
+    startColor: smokeStartColor(colorKey),
     emissionOverTime: new ConstantValue(8 * density * intensity),
     emissionBursts: [],
     shape: new SphereEmitter({
       radius: 0.8 * scale * spread,
-      thickness: 1, // Full volume
+      thickness: 1,
     }),
     material: fillMaterial,
     startTileIndex: new IntervalValue(TileIndex.CloudNoise1, TileIndex.CloudNoise3 + 0.99),
@@ -191,11 +189,15 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     )
   );
 
+  const fillFlipbook = resolveFlipbook(options, 'cloud') ?? resolveFlipbook(options, 'smoke');
+  if (fillFlipbook) {
+    applyFlipbookToSystem(fill, fillFlipbook.meta, fillFlipbook.texture);
+  }
+
   applySoftParticles(fill, options);
   composite.addSystem(fill);
 
   // ── Sub-system 3: Smoke wisps ──
-  // Small, lighter detail particles with more drift
   const wispMaterial = new MeshBasicMaterial({
     map: atlas,
     transparent: true,
@@ -207,13 +209,12 @@ export function createSmoke(renderer: VFXRenderer, options: SmokeOptions = {}): 
     duration,
     looping,
     autoDestroy: !looping,
-    prewarm: looping,
     worldSpace,
     startLife: new IntervalValue(1.5 * scale, 3.5 * scale),
     startSpeed: new IntervalValue(riseSpeed * 0.3, riseSpeed * 0.8),
     startSize: new IntervalValue(0.2 * scale, 0.6 * scale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: smokeGradient('lightGray'),
+    startColor: smokeStartColor('lightGray'),
     emissionOverTime: new ConstantValue(8 * density * intensity),
     emissionBursts: [],
     shape: new ConeEmitter({

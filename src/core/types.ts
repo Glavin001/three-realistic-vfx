@@ -17,6 +17,20 @@ export interface VFXEffectOptions {
   worldSpace?: boolean;
   /** Custom texture to override procedural defaults */
   texture?: Texture;
+  /**
+   * Flipbook element key(s) to use instead of procedural textures.
+   * Pass a single key (e.g., 'WispySmoke01') or an array for the effect
+   * to randomly select from multiple element variants.
+   * The flipbook texture must be pre-loaded via `loadFlipbook()`.
+   * When set, the effect uses animated flipbook frames via FrameOverLife.
+   */
+  flipbook?: string | string[];
+  /**
+   * Pre-loaded flipbook textures, keyed by flipbook element key.
+   * Required when using the `flipbook` option.
+   * Load with `loadFlipbooks(['WispySmoke01', 'Cloud01'])`.
+   */
+  flipbookTextures?: Map<string, Texture>;
   /** Enable soft particles (depth-fade at geometry intersections). Requires depth texture on VFXRenderer. (default: true) */
   softParticles?: boolean;
   /** Soft particle near fade distance (default: 0.1) */

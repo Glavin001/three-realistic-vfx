@@ -23,13 +23,18 @@ import type { VFXRenderer } from '../core/VFXRenderer';
 import { getParticleAtlas, TileIndex, ATLAS_TILE_COUNT } from '../core/TextureAtlas';
 import {
   fireGradient,
+  fireStartColor,
   smokeGradient,
+  smokeStartColor,
   emberGradient,
+  emberStartColor,
   bellCurve,
   growCurve,
   shrinkCurve,
   decelerateCurve,
   applySoftParticles,
+  resolveFlipbook,
+  applyFlipbookToSystem,
 } from '../core/defaults';
 
 /**
@@ -79,7 +84,7 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     duration: 1,
     looping,
     autoDestroy: !looping,
-    prewarm: looping,
+    prewarm: false,
     worldSpace,
     // Wide ranges create layered depth
     startLife: new IntervalValue(0.3 * heightScale, 1.0 * heightScale),
@@ -87,10 +92,16 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     // Wide size range — small hot flickers mixed with large billows
     startSize: new IntervalValue(0.3 * widthScale, 1.4 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: fireGradient(),
+    startColor: fireStartColor(),
     // Higher emission for more particles creating volume
     emissionOverTime: new ConstantValue(40 * intensity),
-    emissionBursts: [],
+    emissionBursts: [{
+      time: 0,
+      count: new ConstantValue(Math.ceil(15 * intensity)),
+      cycle: 1,
+      interval: 0.01,
+      probability: 1,
+    }],
     shape: new ConeEmitter({
       radius: widthScale * 0.7,
       angle: 0.2,
@@ -120,6 +131,12 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     );
   }
 
+  // Apply flipbook element if configured (fire/flame category)
+  const flameFlipbook = resolveFlipbook(options, 'flame') ?? resolveFlipbook(options, 'fire');
+  if (flameFlipbook) {
+    applyFlipbookToSystem(flames, flameFlipbook.meta, flameFlipbook.texture);
+  }
+
   applySoftParticles(flames, options);
   composite.addSystem(flames);
 
@@ -136,13 +153,13 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     duration: 1,
     looping,
     autoDestroy: !looping,
-    prewarm: looping,
+    prewarm: false,
     worldSpace,
     startLife: new IntervalValue(0.2 * heightScale, 0.7 * heightScale),
     startSpeed: new IntervalValue(1.5 * heightScale, 4.0 * heightScale),
     startSize: new IntervalValue(0.2 * widthScale, 0.8 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: fireGradient(),
+    startColor: fireStartColor(),
     emissionOverTime: new ConstantValue(20 * intensity),
     emissionBursts: [],
     shape: new SphereEmitter({
@@ -173,6 +190,12 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     );
   }
 
+  // Use a fireball flipbook for the fill layer if available
+  const fillFlipbook = resolveFlipbook(options, 'fire');
+  if (fillFlipbook) {
+    applyFlipbookToSystem(flameFill, fillFlipbook.meta, fillFlipbook.texture);
+  }
+
   applySoftParticles(flameFill, options);
   composite.addSystem(flameFill);
 
@@ -188,13 +211,13 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
     duration: 1,
     looping,
     autoDestroy: !looping,
-    prewarm: looping,
+    prewarm: false,
     worldSpace,
     startLife: new IntervalValue(0.08, 0.25),
     startSpeed: new ConstantValue(0.5 * heightScale),
     startSize: new IntervalValue(0.6 * widthScale, 1.6 * widthScale),
     startRotation: new IntervalValue(0, Math.PI * 2),
-    startColor: fireGradient(),
+    startColor: fireStartColor(),
     emissionOverTime: new ConstantValue(15 * intensity),
     emissionBursts: [],
     shape: new SphereEmitter({
@@ -229,13 +252,13 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       duration: 1,
       looping,
       autoDestroy: !looping,
-      prewarm: looping,
+      prewarm: false,
       worldSpace,
       startLife: new IntervalValue(1.0, 3.0),
       startSpeed: new IntervalValue(1.5 * heightScale, 4.5 * heightScale),
       startSize: new IntervalValue(0.015 * scale, 0.06 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
-      startColor: emberGradient(),
+      startColor: emberStartColor(),
       // More embers for a richer look
       emissionOverTime: new ConstantValue(15 * emberRate * intensity),
       emissionBursts: [],
@@ -290,13 +313,13 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
       duration: 1,
       looping,
       autoDestroy: !looping,
-      prewarm: looping,
+      prewarm: false,
       worldSpace,
       startLife: new IntervalValue(2.0, 5.0),
       startSpeed: new IntervalValue(1.2 * heightScale, 2.8 * heightScale),
       startSize: new IntervalValue(0.3 * scale, 1.0 * scale),
       startRotation: new IntervalValue(0, Math.PI * 2),
-      startColor: smokeGradient('darkGray'),
+      startColor: smokeStartColor('darkGray'),
       emissionOverTime: new ConstantValue(10 * smokeAmount * intensity),
       emissionBursts: [],
       shape: new ConeEmitter({
@@ -334,6 +357,12 @@ export function createFire(renderer: VFXRenderer, options: FireOptions = {}): VF
           new ConstantValue(wind.z)
         )
       );
+    }
+
+    // Use smoke/cloud flipbook for the smoke layer
+    const smokeFlipbook = resolveFlipbook(options, 'smoke') ?? resolveFlipbook(options, 'cloud');
+    if (smokeFlipbook) {
+      applyFlipbookToSystem(smoke, smokeFlipbook.meta, smokeFlipbook.texture);
     }
 
     applySoftParticles(smoke, options);
