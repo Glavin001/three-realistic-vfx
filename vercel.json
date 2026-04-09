@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm install && npm run build && cd demo && npm install && npx vite build",
+  "outputDirectory": "demo/dist",
+  "installCommand": "echo 'Install handled in buildCommand'",
+  "framework": null
+}
